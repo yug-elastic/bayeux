@@ -25,13 +25,14 @@ type TriggerEvent struct {
 			ReplayID    int       `json:"replayId"`
 			Type        string    `json:"type"`
 		} `json:"event"`
-		Object json.RawMessage `json:"sobject"`
+		Object  json.RawMessage `json:"sobject"`
+		Payload json.RawMessage `json:"payload"`
 	} `json:"data,omitempty"`
 	Channel    string `json:"channel"`
 	Successful bool   `json:"successful,omitempty"`
 }
 
-func (t TriggerEvent) topic() string {
+func (t TriggerEvent) channel() string {
 	s := strings.Replace(t.Channel, "/topic/", "", 1)
 	return s
 }
@@ -157,15 +158,15 @@ type Replay struct {
 	Value int
 }
 
-func (b *Bayeux) subscribe(topic string, replay Replay) Subscription {
+func (b *Bayeux) subscribe(channel string, replay string) Subscription {
 	handshake := fmt.Sprintf(`{
 								"channel": "/meta/subscribe",
-								"subscription": "/topic/%s",
+								"subscription": "%s",
 								"clientId": "%s",
 								"ext": {
-									"replay": {"/topic/%s": "%d"}
+									"replay": {"%s": "%s"}
 									}
-								}`, topic, b.id.clientID, topic, replay)
+								}`, channel, b.id.clientID, channel, replay)
 	resp, err := b.call(handshake, b.creds.bayeuxUrl())
 	if err != nil {
 		logger.Fatalf("Cannot subscribe %s", err)
@@ -174,7 +175,6 @@ func (b *Bayeux) subscribe(topic string, replay Replay) Subscription {
 	defer resp.Body.Close()
 	if os.Getenv("DEBUG") != "" {
 		logger.Printf("Response: %+v", resp)
-		// // Read the content
 		var b []byte
 		if resp.Body != nil {
 			b, _ = ioutil.ReadAll(resp.Body)
@@ -199,15 +199,13 @@ func (b *Bayeux) subscribe(topic string, replay Replay) Subscription {
 	sub := h[0]
 	status.connected = sub.Successful
 	status.clientID = sub.ClientID
-	status.channels = append(status.channels, topic)
+	status.channels = append(status.channels, channel)
 	logger.Printf("Established connection(s): %+v", status)
 	return sub
 }
 
-func (b *Bayeux) connect() chan TriggerEvent {
-	out := make(chan TriggerEvent)
+func (b *Bayeux) connect(out chan TriggerEvent) chan TriggerEvent {
 	go func() {
-		// TODO: add stop chan to bring this thing to halt
 		for {
 			postBody := fmt.Sprintf(`{"channel": "/meta/connect", "connectionType": "long-polling", "clientId": "%s"} `, b.id.clientID)
 			resp, err := b.call(postBody, b.creds.bayeuxUrl())
@@ -215,9 +213,7 @@ func (b *Bayeux) connect() chan TriggerEvent {
 				logger.Printf("Cannot connect to bayeux %s", err)
 				logger.Println("Trying again...")
 			} else {
-				defer resp.Body.Close()
 				if os.Getenv("DEBUG") != "" {
-					// // Read the content
 					var b []byte
 					if resp.Body != nil {
 						b, _ = ioutil.ReadAll(resp.Body)
@@ -277,15 +273,14 @@ func mustGetEnv(s string) string {
 	return r
 }
 
-func (b *Bayeux) TopicToChannel(creds Credentials, topic string) chan TriggerEvent {
+func (b *Bayeux) Channel(out chan TriggerEvent, r string, creds Credentials, channel string) chan TriggerEvent {
 	b.creds = creds
 	err := b.getClientID()
 	if err != nil {
 		log.Fatal("Unable to get bayeux ClientId")
 	}
-	r := Replay{ReplayAll}
-	b.subscribe(topic, r)
-	c := b.connect()
+	b.subscribe(channel, r)
+	c := b.connect(out)
 	wg.Add(1)
 	return c
 }

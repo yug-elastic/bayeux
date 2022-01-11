@@ -3,13 +3,15 @@ package main
 import (
 	"fmt"
 
-	bay "github.com/zph/bayeux"
+	bay "github.com/kush-elastic/bayeux"
 )
 
 func Example() {
+	out := make(chan bay.TriggerEvent)
 	b := bay.Bayeux{}
 	creds := bay.GetSalesforceCredentials()
-	c := b.TopicToChannel(creds, "topicName")
+	replay := "-1"
+	c := b.Channel(out, replay, creds, "channel")
 	for {
 		select {
 		case e := <-c:

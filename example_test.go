@@ -1,11 +1,15 @@
 package bayeux
 
-import "fmt"
+import (
+	"fmt"
+)
 
 func Example() {
+	out := make(chan TriggerEvent)
+	replay := "-1"
 	b := Bayeux{}
 	creds := GetSalesforceCredentials()
-	c := b.TopicToChannel(creds, "topicName")
+	c := b.Channel(out, replay, creds, "channel")
 	for {
 		select {
 		case e := <-c:
