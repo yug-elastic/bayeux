@@ -2,10 +2,11 @@
 Bayeux Client Protocol implemented in Golang (as specified by Salesforce Realtime API)
 
 Fork from zph/bayeux:
+
 	Changes to accept both 'payload' and 'sobject'.
 	All the channels (user-created or generic) should be accepted.
 	Make it so user will pass chan from main function then they can close it anytime.
-	User can metioned replay mechanism from Channel method.
+	User can mention replay mechanism from Channel method.
 
 # Usage
 See `examples/main.go`
@@ -15,7 +16,7 @@ package main
 import (
 	"fmt"
 
-	bay "github.com/kush-elastic/bayeux"
+	bay "github.com/elastic/bayeux"
 )
 
 func Example() {
