@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	bay "github.com/kush-elastic/bayeux"
+	bay "github.com/elastic/bayeux"
 )
 
 func Example() {

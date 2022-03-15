@@ -239,17 +239,17 @@ func (b *Bayeux) connect(out chan TriggerEvent) chan TriggerEvent {
 }
 
 func GetSalesforceCredentials() Credentials {
-	route := "https://login.salesforce.com/services/oauth2/token"
 	clientID := mustGetEnv("SALESFORCE_CONSUMER_KEY")
 	clientSecret := mustGetEnv("SALESFORCE_CONSUMER_SECRET")
 	username := mustGetEnv("SALESFORCE_USER")
 	password := mustGetEnv("SALESFORCE_PASSWORD")
+	tokenURL := mustGetEnv("SALESFORCE_TOKEN_URL")
 	params := url.Values{"grant_type": {"password"},
 		"client_id":     {clientID},
 		"client_secret": {clientSecret},
 		"username":      {username},
 		"password":      {password}}
-	res, err := http.PostForm(route, params)
+	res, err := http.PostForm(tokenURL, params)
 	if err != nil {
 		logger.Fatal(err)
 	}
