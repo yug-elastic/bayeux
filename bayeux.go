@@ -237,13 +237,7 @@ func (b *Bayeux) connect(out chan TriggerEvent) chan TriggerEvent {
 	}()
 	return out
 }
-
-func GetSalesforceCredentials() Credentials {
-	clientID := mustGetEnv("SALESFORCE_CONSUMER_KEY")
-	clientSecret := mustGetEnv("SALESFORCE_CONSUMER_SECRET")
-	username := mustGetEnv("SALESFORCE_USER")
-	password := mustGetEnv("SALESFORCE_PASSWORD")
-	tokenURL := mustGetEnv("SALESFORCE_TOKEN_URL")
+func GetSalesforceCredentials(clientID string, clientSecret string, username string, password string, tokenURL string) Credentials {
 	params := url.Values{"grant_type": {"password"},
 		"client_id":     {clientID},
 		"client_secret": {clientSecret},
@@ -260,17 +254,9 @@ func GetSalesforceCredentials() Credentials {
 	} else if err != nil {
 		logger.Fatal(err)
 	} else if creds.AccessToken == "" {
-		logger.Fatalf("Unable to fetch access token. Check credentials in environmental variables")
+		logger.Fatalf("Unable to fetch access token.")
 	}
 	return creds
-}
-
-func mustGetEnv(s string) string {
-	r := os.Getenv(s)
-	if r == "" {
-		panic(fmt.Sprintf("Could not fetch key %s", s))
-	}
-	return r
 }
 
 func (b *Bayeux) Channel(out chan TriggerEvent, r string, creds Credentials, channel string) chan TriggerEvent {
