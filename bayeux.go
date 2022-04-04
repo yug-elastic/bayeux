@@ -81,6 +81,14 @@ type clientIDAndCookies struct {
 	cookies  []*http.Cookie
 }
 
+type AuthenticationParameters struct {
+	ClientID     string
+	ClientSecret string
+	Username     string
+	Password     string
+	TokenURL     string
+}
+
 // Bayeux struct allow for centralized storage of creds, ids, and cookies
 type Bayeux struct {
 	creds Credentials
@@ -237,26 +245,27 @@ func (b *Bayeux) connect(out chan TriggerEvent) chan TriggerEvent {
 	}()
 	return out
 }
-func GetSalesforceCredentials(clientID string, clientSecret string, username string, password string, tokenURL string) Credentials {
+
+func GetSalesforceCredentials(ap *AuthenticationParameters) (*Credentials, err) {
 	params := url.Values{"grant_type": {"password"},
-		"client_id":     {clientID},
-		"client_secret": {clientSecret},
-		"username":      {username},
-		"password":      {password}}
-	res, err := http.PostForm(tokenURL, params)
+		"client_id":     {ap.ClientID},
+		"client_secret": {ap.ClientSecret},
+		"username":      {ap.Username},
+		"password":      {ap.Password}}
+	res, err := http.PostForm(ap.TokenURL, params)
 	if err != nil {
 		logger.Fatal(err)
 	}
 	decoder := json.NewDecoder(res.Body)
 	var creds Credentials
 	if err := decoder.Decode(&creds); err == io.EOF {
-		logger.Fatal(err)
+		return nil, err
 	} else if err != nil {
-		logger.Fatal(err)
+		return nil, err
 	} else if creds.AccessToken == "" {
-		logger.Fatalf("Unable to fetch access token.")
+		return nil, fmt.Errorf("Unable to fetch access token: %w", err)
 	}
-	return creds
+	return creds, nil
 }
 
 func (b *Bayeux) Channel(out chan TriggerEvent, r string, creds Credentials, channel string) chan TriggerEvent {
