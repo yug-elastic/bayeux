@@ -82,11 +82,11 @@ type clientIDAndCookies struct {
 }
 
 type AuthenticationParameters struct {
-	ClientID     string
-	ClientSecret string
-	Username     string
-	Password     string
-	TokenURL     string
+	ClientID     string // consumer key from Salesforce (e.g. 3MVG9pRsdbjsbdjfm1I.fz3f7zBuH4xdKCJcM9B5XLgxXh2AFTmQmr8JMn1vsadjsadjjsadakd_C)
+	ClientSecret string // consumer secret from Salesforce (e.g. E9FE118633BC7SGDADUHUE81F19C1D4529D09CB7231754AD2F2CA668400619)
+	Username     string // Salesforce user email (e.g. salesforce.user@email.com)
+	Password     string // Salesforce password
+	TokenURL     string // Salesforce token endpoint (e.g. https://login.salesforce.com/services/oauth2/token)
 }
 
 // Bayeux struct allow for centralized storage of creds, ids, and cookies
@@ -246,7 +246,7 @@ func (b *Bayeux) connect(out chan TriggerEvent) chan TriggerEvent {
 	return out
 }
 
-func GetSalesforceCredentials(ap *AuthenticationParameters) (*Credentials, err) {
+func GetSalesforceCredentials(ap AuthenticationParameters) (*Credentials, err) {
 	params := url.Values{"grant_type": {"password"},
 		"client_id":     {ap.ClientID},
 		"client_secret": {ap.ClientSecret},
