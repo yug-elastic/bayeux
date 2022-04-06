@@ -3,7 +3,6 @@ package bayeux
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -11,7 +10,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"strings"
 	"sync"
 	"time"
 )
@@ -30,11 +28,6 @@ type TriggerEvent struct {
 	} `json:"data,omitempty"`
 	Channel    string `json:"channel"`
 	Successful bool   `json:"successful,omitempty"`
-}
-
-func (t TriggerEvent) channel() string {
-	s := strings.Replace(t.Channel, "/topic/", "", 1)
-	return s
 }
 
 // Status is the state of success and subscribed channels
@@ -123,7 +116,7 @@ func (b *Bayeux) call(body string, route string) (resp *http.Response, e error) 
 		logger.Printf("Bad bayeuxCall io.EOF: %s\n", err)
 		logger.Printf("Bad bayeuxCall Response: %+v\n", resp)
 	} else if err != nil {
-		e = errors.New(fmt.Sprintf("Unknown error: %s", err))
+		e = fmt.Errorf("unknown error: %w", err)
 		logger.Printf("Bad unrecoverable Call: %s", err)
 	}
 	return resp, e
@@ -262,7 +255,7 @@ func GetSalesforceCredentials(ap AuthenticationParameters) (creds *Credentials, 
 	} else if err != nil {
 		return nil, err
 	} else if creds.AccessToken == "" {
-		return nil, fmt.Errorf("Unable to fetch access token: %w", err)
+		return nil, fmt.Errorf("unable to fetch access token: %w", err)
 	}
 	return creds, nil
 }
