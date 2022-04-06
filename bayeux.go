@@ -246,7 +246,7 @@ func (b *Bayeux) connect(out chan TriggerEvent) chan TriggerEvent {
 	return out
 }
 
-func GetSalesforceCredentials(ap AuthenticationParameters) (*Credentials, err) {
+func GetSalesforceCredentials(ap AuthenticationParameters) (creds *Credentials, err error) {
 	params := url.Values{"grant_type": {"password"},
 		"client_id":     {ap.ClientID},
 		"client_secret": {ap.ClientSecret},
@@ -257,7 +257,6 @@ func GetSalesforceCredentials(ap AuthenticationParameters) (*Credentials, err) {
 		logger.Fatal(err)
 	}
 	decoder := json.NewDecoder(res.Body)
-	var creds Credentials
 	if err := decoder.Decode(&creds); err == io.EOF {
 		return nil, err
 	} else if err != nil {
