@@ -3,7 +3,6 @@ package bayeux
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -11,7 +10,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"strings"
 	"sync"
 	"time"
 )
@@ -30,11 +28,6 @@ type TriggerEvent struct {
 	} `json:"data,omitempty"`
 	Channel    string `json:"channel"`
 	Successful bool   `json:"successful,omitempty"`
-}
-
-func (t TriggerEvent) channel() string {
-	s := strings.Replace(t.Channel, "/topic/", "", 1)
-	return s
 }
 
 // Status is the state of success and subscribed channels
@@ -81,6 +74,14 @@ type clientIDAndCookies struct {
 	cookies  []*http.Cookie
 }
 
+type AuthenticationParameters struct {
+	ClientID     string // consumer key from Salesforce (e.g. 3MVG9pRsdbjsbdjfm1I.fz3f7zBuH4xdKCJcM9B5XLgxXh2AFTmQmr8JMn1vsadjsadjjsadakd_C)
+	ClientSecret string // consumer secret from Salesforce (e.g. E9FE118633BC7SGDADUHUE81F19C1D4529D09CB7231754AD2F2CA668400619)
+	Username     string // Salesforce user email (e.g. salesforce.user@email.com)
+	Password     string // Salesforce password
+	TokenURL     string // Salesforce token endpoint (e.g. https://login.salesforce.com/services/oauth2/token)
+}
+
 // Bayeux struct allow for centralized storage of creds, ids, and cookies
 type Bayeux struct {
 	creds Credentials
@@ -115,7 +116,7 @@ func (b *Bayeux) call(body string, route string) (resp *http.Response, e error) 
 		logger.Printf("Bad bayeuxCall io.EOF: %s\n", err)
 		logger.Printf("Bad bayeuxCall Response: %+v\n", resp)
 	} else if err != nil {
-		e = errors.New(fmt.Sprintf("Unknown error: %s", err))
+		e = fmt.Errorf("unknown error: %w", err)
 		logger.Printf("Bad unrecoverable Call: %s", err)
 	}
 	return resp, e
@@ -238,39 +239,25 @@ func (b *Bayeux) connect(out chan TriggerEvent) chan TriggerEvent {
 	return out
 }
 
-func GetSalesforceCredentials() Credentials {
-	clientID := mustGetEnv("SALESFORCE_CONSUMER_KEY")
-	clientSecret := mustGetEnv("SALESFORCE_CONSUMER_SECRET")
-	username := mustGetEnv("SALESFORCE_USER")
-	password := mustGetEnv("SALESFORCE_PASSWORD")
-	tokenURL := mustGetEnv("SALESFORCE_TOKEN_URL")
+func GetSalesforceCredentials(ap AuthenticationParameters) (creds *Credentials, err error) {
 	params := url.Values{"grant_type": {"password"},
-		"client_id":     {clientID},
-		"client_secret": {clientSecret},
-		"username":      {username},
-		"password":      {password}}
-	res, err := http.PostForm(tokenURL, params)
+		"client_id":     {ap.ClientID},
+		"client_secret": {ap.ClientSecret},
+		"username":      {ap.Username},
+		"password":      {ap.Password}}
+	res, err := http.PostForm(ap.TokenURL, params)
 	if err != nil {
 		logger.Fatal(err)
 	}
 	decoder := json.NewDecoder(res.Body)
-	var creds Credentials
 	if err := decoder.Decode(&creds); err == io.EOF {
-		logger.Fatal(err)
+		return nil, err
 	} else if err != nil {
-		logger.Fatal(err)
+		return nil, err
 	} else if creds.AccessToken == "" {
-		logger.Fatalf("Unable to fetch access token. Check credentials in environmental variables")
+		return nil, fmt.Errorf("unable to fetch access token: %w", err)
 	}
-	return creds
-}
-
-func mustGetEnv(s string) string {
-	r := os.Getenv(s)
-	if r == "" {
-		panic(fmt.Sprintf("Could not fetch key %s", s))
-	}
-	return r
+	return creds, nil
 }
 
 func (b *Bayeux) Channel(out chan TriggerEvent, r string, creds Credentials, channel string) chan TriggerEvent {
