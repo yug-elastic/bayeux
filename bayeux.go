@@ -42,10 +42,19 @@ type TriggerEvent struct {
 }
 
 // Status is the state of success and subscribed channels
-type Status struct {
-	connected bool
-	clientID  string
-	channels  []string
+type status struct {
+	connected    bool
+	clientID     string
+	channels     []string
+	connectCount int
+}
+
+func (st *status) connect() {
+	st.connectCount++
+}
+
+func (st *status) disconnect() {
+	st.connectCount--
 }
 
 type BayeuxHandshake []struct {
@@ -101,7 +110,7 @@ type Bayeux struct {
 
 var wg sync.WaitGroup
 var logger = log.New(os.Stdout, "", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile)
-var status = Status{false, "", []string{}}
+var st = status{false, "", []string{}, 0}
 
 // newHTTPRequest is to create requests with context
 func (b *Bayeux) newHTTPRequest(ctx context.Context, body string, route string) (*http.Request, error) {
@@ -221,20 +230,26 @@ func (b *Bayeux) subscribe(ctx context.Context, channel string, replay string) e
 		return err
 	}
 	sub := &h[0]
-	status.connected = sub.Successful
-	status.clientID = sub.ClientID
-	status.channels = append(status.channels, channel)
+	st.connected = sub.Successful
+	st.clientID = sub.ClientID
+	st.channels = append(st.channels, channel)
+	st.connect()
 	if os.Getenv("DEBUG") != "" {
-		logger.Printf("Established connection(s): %+v", status)
+		logger.Printf("Established connection(s): %+v", st)
 	}
 	return nil
 }
 
 func (b *Bayeux) connect(ctx context.Context, out chan MaybeMsg) chan MaybeMsg {
+	var waitMsgs sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		defer wg.Done()
-		defer close(out)
+		defer func() {
+			waitMsgs.Wait()
+			close(out)
+			st.disconnect()
+			wg.Done()
+		}()
 		for {
 			select {
 			case <-ctx.Done():
@@ -265,14 +280,23 @@ func (b *Bayeux) connect(ctx context.Context, out chan MaybeMsg) chan MaybeMsg {
 						out <- MaybeMsg{Err: err}
 						return
 					}
-					for _, e := range x {
-						out <- MaybeMsg{Msg: e}
+					for i := range x {
+						waitMsgs.Add(1)
+						go func(e TriggerEvent) {
+							defer waitMsgs.Done()
+							out <- MaybeMsg{Msg: e}
+						}(x[i])
 					}
 				}
 			}
 		}
 	}()
 	return out
+}
+
+// GetConnectedCount returns count of subcriptions
+func GetConnectedCount() int {
+	return st.connectCount
 }
 
 func GetSalesforceCredentials(ap AuthenticationParameters) (creds *Credentials, err error) {
